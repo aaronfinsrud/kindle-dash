@@ -1,22 +1,24 @@
-#!/usr/bin/env sh
+export TIMEZONE="America/New_York"
 
-# Export environment variables here
-export WIFI_TEST_IP=${WIFI_TEST_IP:-1.1.1.1}
-export REFRESH_SCHEDULE=${REFRESH_SCHEDULE:-"2,32 8-17 * * MON-FRI"}
-export TIMEZONE=${TIMEZONE:-"Europe/Amsterdam"}
+# cron expression: when to wake and refresh
+# every 30 min, all day, every day
+export REFRESH_SCHEDULE="0,30 * * * *"
 
-# By default, partial screen updates are used to update the screen,
-# to prevent the screen from flashing. After a few partial updates,
-# the screen will start to look a bit distorted (due to e-ink ghosting).
-# This number determines when a full refresh is triggered. By default it's
-# triggered after 4 partial updates.
-export FULL_DISPLAY_REFRESH_RATE=${FULL_DISPLAY_REFRESH_RATE:-4}
+# burst window: while the current time is inside this cron window the device
+# stays awake (no suspend) and refreshes every BURST_INTERVAL seconds.
+# 8:00-8:30 Mon-Fri, every 30s
+export BURST_SCHEDULE="0-30 8 * * MON-FRI"
+export BURST_INTERVAL=30
 
-# When the time until the next wakeup is greater or equal to this number,
-# the dashboard will not be refreshed anymore, but instead show a
-# 'kindle is sleeping' screen. This can be useful if your schedule only runs
-# during the day, for example.
+# every Nth refresh is a full flashing refresh, to clear ghosting
+export FULL_DISPLAY_REFRESH_RATE=6
+
+# if the next wakeup is further out than this many seconds,
+# show sleeping.png instead of the dashboard
 export SLEEP_SCREEN_INTERVAL=3600
 
-export LOW_BATTERY_REPORTING=${LOW_BATTERY_REPORTING:-false}
+# something on your LAN that always answers ping (usually the router)
+export WIFI_TEST_IP=192.168.1.1
+
+export LOW_BATTERY_REPORTING=true
 export LOW_BATTERY_THRESHOLD_PERCENT=10

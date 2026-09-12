@@ -8,6 +8,8 @@ FETCH_DASHBOARD_CMD="$DIR/local/fetch-dashboard.sh"
 LOW_BATTERY_CMD="$DIR/local/low-battery.sh"
 
 REFRESH_SCHEDULE=${REFRESH_SCHEDULE:-"2,32 8-17 * * MON-FRI"}
+BURST_SCHEDULE=${BURST_SCHEDULE:-""}
+BURST_INTERVAL=${BURST_INTERVAL:-30}
 FULL_DISPLAY_REFRESH_RATE=${FULL_DISPLAY_REFRESH_RATE:-0}
 SLEEP_SCREEN_INTERVAL=${SLEEP_SCREEN_INTERVAL:-3600}
 RTC=/sys/devices/platform/mxc_rtc.0/wakeup_enable
@@ -27,10 +29,19 @@ init() {
 
   echo "Starting dashboard with $REFRESH_SCHEDULE refresh..."
 
-  /etc/init.d/framework stop
+  # PW3: upstart-based firmware
+  trap "" TERM
+  stop lab126_gui
+  usleep 1250000
+  trap - TERM
+
   initctl stop webreader >/dev/null 2>&1
+  # /etc/init.d/framework stop   # Kindle 4 NT only
+
   echo powersave >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
   lipc-set-prop com.lab126.powerd preventScreenSaver 1
+  # PW3: front light off (0-24)
+  lipc-set-prop com.lab126.powerd flIntensity 0
 }
 
 prepare_sleep() {
@@ -83,21 +94,41 @@ log_battery_stats() {
   fi
 }
 
+RTC_WAKEALARM=/sys/class/rtc/rtc1/wakealarm
+
 rtc_sleep() {
   duration=$1
 
   if [ "$DEBUG" = true ]; then
     sleep "$duration"
   else
-    # shellcheck disable=SC2039
-    [ "$(cat "$RTC")" -eq 0 ] && echo -n "$duration" >"$RTC"
-    echo "mem" >/sys/power/state
+    echo "" > "$RTC_WAKEALARM"            # clear any pending alarm first
+    echo "+$duration" > "$RTC_WAKEALARM"  # relative, in seconds
+    echo mem > /sys/power/state
   fi
+}
+
+# true when the current minute is inside BURST_SCHEDULE, i.e. the next
+# matching minute is at most 60s away
+in_burst_window() {
+  [ -n "$BURST_SCHEDULE" ] || return 1
+  secs=$("$DIR/next-wakeup" --schedule="$BURST_SCHEDULE" --timezone="$TIMEZONE") || return 1
+  [ "$secs" -le 60 ]
 }
 
 main_loop() {
   while true; do
     log_battery_stats
+
+    if in_burst_window; then
+      # stay awake and refresh every BURST_INTERVAL seconds
+      start=$(date +%s)
+      refresh_dashboard
+      elapsed=$(( $(date +%s) - start ))
+      remaining=$(( BURST_INTERVAL - elapsed ))
+      [ "$remaining" -gt 0 ] && sleep "$remaining"
+      continue
+    fi
 
     next_wakeup_secs=$("$DIR/next-wakeup" --schedule="$REFRESH_SCHEDULE" --timezone="$TIMEZONE")
 
