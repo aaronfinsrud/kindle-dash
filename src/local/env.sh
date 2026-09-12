@@ -1,17 +1,21 @@
 export TIMEZONE="America/New_York"
 
 # --- normal mode: twice a day ---------------------------------------------
-export DASHBOARD_URL="https://e-ink-tracker.vercel.app/api/snapshot.png"
+export DASHBOARD_URL="https://e-ink-tracker.vercel.app/daily-dashboard/api/snapshot.png"
 # cron expression: when to wake and refresh (7:00 and 19:00 every day)
-export REFRESH_SCHEDULE="0 7,19 * * *"
+export REFRESH_SCHEDULE="0 0,12 * * *"
 
 # --- burst mode: commute window --------------------------------------------
 # while the current time is inside this cron window the device stays awake
 # (no suspend) and fetches BURST_URL every BURST_INTERVAL seconds.
 # 8:00-8:37 Mon-Fri, every 60s
-export BURST_URL="https://e-ink-tracker.vercel.app/daily-dashboard/api/snapshot.png"
+export BURST_URL="https://e-ink-tracker.vercel.app/api/snapshot.png"
 export BURST_SCHEDULE="0-37 8 * * MON-FRI"
 export BURST_INTERVAL=60
+
+# pressing the power button while suspended does a one-off fetch of BURST_URL;
+# after this many seconds the regular dashboard is fetched again (0 = never)
+export MANUAL_REVERT_SECS=240
 
 # every Nth refresh is a full flashing refresh, to clear ghosting
 export FULL_DISPLAY_REFRESH_RATE=6

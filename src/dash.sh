@@ -10,6 +10,8 @@ LOW_BATTERY_CMD="$DIR/local/low-battery.sh"
 REFRESH_SCHEDULE=${REFRESH_SCHEDULE:-"2,32 8-17 * * MON-FRI"}
 BURST_SCHEDULE=${BURST_SCHEDULE:-""}
 BURST_INTERVAL=${BURST_INTERVAL:-30}
+BURST_URL=${BURST_URL:-""}
+MANUAL_REVERT_SECS=${MANUAL_REVERT_SECS:-600}
 FULL_DISPLAY_REFRESH_RATE=${FULL_DISPLAY_REFRESH_RATE:-0}
 SLEEP_SCREEN_INTERVAL=${SLEEP_SCREEN_INTERVAL:-3600}
 RTC=/sys/devices/platform/mxc_rtc.0/wakeup_enable
@@ -56,11 +58,12 @@ prepare_sleep() {
   num_refresh=$FULL_DISPLAY_REFRESH_RATE
 }
 
+# $1: optional URL override, falls back to DASHBOARD_URL inside fetch-dashboard.sh
 refresh_dashboard() {
-  echo "Refreshing dashboard"
+  echo "Refreshing dashboard ${1:+from $1}"
   "$DIR/wait-for-wifi.sh" "$WIFI_TEST_IP"
 
-  "$FETCH_DASHBOARD_CMD" "$DASH_PNG"
+  "$FETCH_DASHBOARD_CMD" "$DASH_PNG" "$1"
   fetch_status=$?
 
   if [ "$fetch_status" -ne 0 ]; then
@@ -117,13 +120,15 @@ in_burst_window() {
 }
 
 main_loop() {
+  manual_wake=false
+
   while true; do
     log_battery_stats
 
     if in_burst_window; then
       # stay awake and refresh every BURST_INTERVAL seconds
       start=$(date +%s)
-      refresh_dashboard
+      refresh_dashboard "$BURST_URL"
       elapsed=$(( $(date +%s) - start ))
       remaining=$(( BURST_INTERVAL - elapsed ))
       [ "$remaining" -gt 0 ] && sleep "$remaining"
@@ -132,7 +137,28 @@ main_loop() {
 
     next_wakeup_secs=$("$DIR/next-wakeup" --schedule="$REFRESH_SCHEDULE" --timezone="$TIMEZONE")
 
-    if [ "$next_wakeup_secs" -gt "$SLEEP_SCREEN_INTERVAL" ]; then
+    # also wake up for the start of the burst window, whichever comes first
+    if [ -n "$BURST_SCHEDULE" ]; then
+      next_burst_secs=$("$DIR/next-wakeup" --schedule="$BURST_SCHEDULE" --timezone="$TIMEZONE")
+      if [ -n "$next_burst_secs" ] && [ "$next_burst_secs" -lt "$next_wakeup_secs" ]; then
+        next_wakeup_secs=$next_burst_secs
+      fi
+    fi
+
+    if [ "$manual_wake" = true ] && [ -n "$BURST_URL" ]; then
+      # woken by the power button (or USB): one-off fetch of BURST_URL,
+      # which stays on screen until the next scheduled refresh
+      manual_wake=false
+      action="suspend"
+      echo "Manual wake, one-off burst refresh"
+      refresh_dashboard "$BURST_URL"
+
+      # wake again after MANUAL_REVERT_SECS (unless something is sooner) so the
+      # normal path below restores the regular dashboard
+      if [ "$MANUAL_REVERT_SECS" -gt 0 ] && [ "$MANUAL_REVERT_SECS" -lt "$next_wakeup_secs" ]; then
+        next_wakeup_secs=$MANUAL_REVERT_SECS
+      fi
+    elif [ "$next_wakeup_secs" -gt "$SLEEP_SCREEN_INTERVAL" ]; then
       action="sleep"
       prepare_sleep
     else
@@ -145,7 +171,15 @@ main_loop() {
 
     echo "Going to $action, next wakeup in ${next_wakeup_secs}s"
 
+    sleep_start=$(date +%s)
     rtc_sleep "$next_wakeup_secs"
+
+    # rtc_sleep only returns this early if something other than the RTC alarm
+    # (power button, USB plug) woke the device
+    slept=$(( $(date +%s) - sleep_start ))
+    if [ "$slept" -lt $(( next_wakeup_secs - 60 )) ]; then
+      manual_wake=true
+    fi
   done
 }
 
