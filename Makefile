@@ -15,6 +15,7 @@ dist/%: src/%
 
 dist/next-wakeup: ${NEXT_WAKEUP_SRC_FILES}
 	cd src/next-wakeup && cross build --release --target arm-unknown-linux-musleabi
+	mkdir -p dist
 	cp src/next-wakeup/target/arm-unknown-linux-musleabi/release/next-wakeup dist/
 
 dist/xh: tmp/xh
@@ -23,6 +24,7 @@ dist/xh: tmp/xh
 		-v $(shell pwd)/tmp/xh:/src \
 		rustembedded/cross:arm-unknown-linux-musleabi-0.2.1 \
 		/usr/local/arm-linux-musleabi/bin/strip /src/target/arm-unknown-linux-musleabi/release/xh
+	mkdir -p dist
 	cp tmp/xh/target/arm-unknown-linux-musleabi/release/xh dist/
 
 tmp/xh:
