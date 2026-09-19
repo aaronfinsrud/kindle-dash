@@ -10,7 +10,7 @@ export REFRESH_SCHEDULE="0 0,12 * * *"
 # (no suspend) and fetches BURST_URL every BURST_INTERVAL seconds.
 # 8:00-8:37 Mon-Fri, every 60s
 export BURST_URL="https://e-ink-tracker.vercel.app/api/snapshot.png"
-export BURST_SCHEDULE="0-37 8 * * MON-FRI"
+export BURST_SCHEDULE="0-37 8 * * TUE-THU"
 export BURST_INTERVAL=60
 
 # pressing the power button while suspended does a one-off fetch of BURST_URL;
