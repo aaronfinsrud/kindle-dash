@@ -8,7 +8,7 @@ export REFRESH_SCHEDULE="0 0,12 * * *"
 # --- burst mode: commute window --------------------------------------------
 # while the current time is inside this cron window the device stays awake
 # (no suspend) and fetches BURST_URL every BURST_INTERVAL seconds.
-# 8:00-8:37 Mon-Fri, every 60s
+# 8:00-8:37 Tue-Thu, every 60s
 export BURST_URL="https://e-ink-tracker.vercel.app/api/snapshot.png"
 export BURST_SCHEDULE="0-37 8 * * TUE-THU"
 export BURST_INTERVAL=60
