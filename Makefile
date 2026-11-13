@@ -1,6 +1,7 @@
 VERSION := v1.0.0-beta.4
 KINDLE_HOST ?= kindle
 KINDLE_DIR ?= /mnt/us/dashboard
+KUAL_DIR ?= /mnt/us/extensions/kindle-dash
 SRC_FILES := $(shell find src -name '*.sh' -o -name '*.png')
 NEXT_WAKEUP_SRC_FILES := $(shell find src/next-wakeup/src -name '*.rs')
 TARGET_FILES := $(SRC_FILES:src/%=dist/%)
@@ -58,11 +59,15 @@ push: dist
 push-all: dist
 	rsync -vr --exclude=local/state dist/ ${KINDLE_HOST}:${KINDLE_DIR}
 
+# Push the KUAL launcher extension
+push-kual:
+	rsync -vr KUAL/kindle-dash/ ${KINDLE_HOST}:${KUAL_DIR}
+
 # Restart the dashboard on the Kindle
 restart:
 	ssh ${KINDLE_HOST} '${KINDLE_DIR}/stop.sh; ${KINDLE_DIR}/start.sh'
 
 # Push and restart in one go
-deploy: push-all restart
+deploy: push-all push-kual restart
 
-.PHONY: clean watch tarball format pull push push-all restart deploy
+.PHONY: clean watch tarball format pull push push-all push-kual restart deploy
